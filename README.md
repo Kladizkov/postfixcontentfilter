@@ -13,6 +13,6 @@ Postfix has a feature for Advanced Content Filter. A custom script listens at lo
 
 pfcf ( stands for postfix content filter ) has three files - pfcf.ini, pfcf.py and pfcf.service.
 
-pfcf.ini - The config file.
-pfcf.py - The python script that does the content filter
-pfcf.service - The systemd service file for easy start, restart and stop job.
+pfcf.ini - The config file.   
+pfcf.py - The python script that does the content filter   
+pfcf.service - The systemd service file for easy start, restart and stop job.   
