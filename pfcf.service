@@ -1,0 +1,11 @@
+[Unit]
+Description=pfcf
+
+[Service]
+ExecStart=/usr/bin/python /usr/local/bin/pfcf.py
+Restart=on-failure
+Type=notify
+User=root
+
+[Install]
+WantedBy=default.target
