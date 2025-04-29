@@ -1,11 +1,13 @@
 [Unit]
-Description=pfcf
+Description=Policy Filtered Custom SMTP Server
+After=network.target
 
 [Service]
-ExecStart=/usr/bin/python /usr/local/bin/pfcf.py
+Type=simple
+ExecStart=/usr/bin/python3 /usr/local/bin/pfcf.py
 Restart=on-failure
-Type=notify
-User=root
+StandardOutput=journal
+StandardError=journal
 
 [Install]
-WantedBy=default.target
+WantedBy=multi-user.target
