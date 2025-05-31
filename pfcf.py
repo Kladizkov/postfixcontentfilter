@@ -39,6 +39,9 @@ class CustomSMTPHandler(AsyncMessage):
         xrcpttos.extend(message.get_all('X-RcptTo', []))
         xrcpttos = [addr.strip() for part in xrcpttos for addr in part.split(';')]
         xrcpttos = [addr.strip() for part in xrcpttos for addr in part.split(',')]
+        # Remove duplicates from xrcpttos while preserving order
+        seen = set()
+        xrcpttos = [x for x in xrcpttos if not (x in seen or seen.add(x))]
         
         logging.info("Content Filter Started")
         logging.info("Message addressed from: %s", mailfrom)
@@ -60,7 +63,8 @@ class CustomSMTPHandler(AsyncMessage):
                     logging.info("Unprivileged sender. Filtering.")
                     for rcptTo in xrcpttos:
                         if any(domain in rcptTo for domain in self.allowedOutboundDomains):
-                            xrcpttos_filtered.append(rcptTo)
+                            if rcptTo not in xrcpttos_filtered:
+                                xrcpttos_filtered.append(rcptTo)
                     if len(xrcpttos) != len(xrcpttos_filtered):
                         mailRejected = 1
                         syslog.syslog('pfcf: All or some recipient rejected.')
