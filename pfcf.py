@@ -18,6 +18,11 @@ class CustomSMTPHandler(AsyncMessage):
         self.load_config()
 
     def load_config(self):
+        self.warnOnUnknownDomain = self.config.getboolean('default', 'WarnOnUnknownDomain', fallback=False)
+        self.knownDomains = [d.strip().lower() for d in self.config.get('default', 'KnownSenderDomains', fallback='').split(',')]
+        self.warningExemptRecipientDomains = [d.strip().lower() for d in self.config.get('default', 'WarningExemptRecipientDomains', fallback='').split(',')]
+        self.warningExemptRecipientEmails = [e.strip().lower() for e in self.config.get('default', 'WarningExemptRecipientEmails', fallback='').split(',')]
+
         self.companyName = self.config.get('default', 'CompanyName')
         self.adminEmail = self.config.get('default', 'AdminEmail')
         self.primarySenderDomainToFilter = self.config.get('default', 'PrimarySenderDomainToFilter')
@@ -64,6 +69,32 @@ class CustomSMTPHandler(AsyncMessage):
         logging.info("Content Filter Started")
         logging.info("Message addressed from: %s", mailfrom)
         logging.info("Message addressed to (X-RcptTo): %s", ', '.join(xrcpttos)) if xrcpttos else logging.info("No X-RcptTo recipients")
+
+                # --- UNKNOWN DOMAIN WARNING ---
+        sender_domain = mailfrom.split('@')[-1].lower() if '@' in mailfrom else ''
+
+        def is_recipient_exempt():
+            for rcpt in xrcpttos:
+                rcpt = rcpt.lower()
+                rcpt_domain = rcpt.split('@')[-1]
+                if rcpt in self.warningExemptRecipientEmails:
+                    return True
+                if rcpt_domain in self.warningExemptRecipientDomains:
+                    return True
+            return False
+
+        if self.warnOnUnknownDomain and sender_domain not in self.knownDomains and not is_recipient_exempt():
+            if message.is_multipart():
+                for part in message.walk():
+                    if part.get_content_type() == 'text/html':
+                        html = part.get_content()
+                        warning_html = "<div style='color:red; font-weight:bold;'>Do not open any attachment or click on links in this email.</div><br/>" + html
+                        part.set_content(warning_html, subtype='html')
+            else:
+                if message.get_content_type() == 'text/html':
+                    html = message.get_content()
+                    warning_html = "<div style='color:red; font-weight:bold;'>Do not open any attachment or click on links in this email.</div><br/>" + html
+                    message.set_content(warning_html, subtype='html')
 
         mailToFilter = 0
         mailRejected = 0
