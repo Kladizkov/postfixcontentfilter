@@ -34,6 +34,15 @@ class CustomSMTPHandler(AsyncMessage):
         )
 
     async def handle_message(self, message: EmailMessage):
+        # --- LOOP PREVENTION CHECK ---
+        if message.get('X-PFCF-Processed') == 'yes' or message.get('X-Loop') == 'pfcf@metclouds.com':
+            syslog.syslog('pfcf: Loop detected. Skipping message.')
+            logging.warning("Loop detected. Skipping message.")
+            return
+
+        # --- ADD LOOP PREVENTION HEADERS ---
+        message.add_header('X-PFCF-Processed', 'yes')
+        message.add_header('X-Loop', 'pfcf@metclouds.com')  # Use your own unique domain
         mailfrom = message['X-MailFrom'].replace("'", "").replace('"', '')
         xrcpttos = []
         xrcpttos.extend(message.get_all('X-RcptTo', []))
