@@ -87,15 +87,17 @@ class CustomSMTPHandler(AsyncMessage):
             if message.is_multipart():
                 for part in message.walk():
                     if part.get_content_type() == 'text/html':
-                        html = part.get_content()
+                        html = part.get_payload(decode=True).decode(errors='replace')
                         warning_html = "<div style='color:red; font-weight:bold;'>Do not open any attachment or click on links in this email.</div><br/>" + html
-                        part.set_content(warning_html, subtype='html')
+                        part.set_payload(warning_html)
+                        part.set_type('text/html')
                         logging.info("Warning text added")
             else:
                 if message.get_content_type() == 'text/html':
-                    html = message.get_content()
+                    html = message.get_payload(decode=True).decode(errors='replace')
                     warning_html = "<div style='color:red; font-weight:bold;'>Do not open any attachment or click on links in this email.</div><br/>" + html
-                    message.set_content(warning_html, subtype='html')
+                    message.set_payload(warning_html)
+                    message.set_type('text/html')
                     logging.info("Warning text added")
 
         mailToFilter = 0
