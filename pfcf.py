@@ -90,11 +90,13 @@ class CustomSMTPHandler(AsyncMessage):
                         html = part.get_content()
                         warning_html = "<div style='color:red; font-weight:bold;'>Do not open any attachment or click on links in this email.</div><br/>" + html
                         part.set_content(warning_html, subtype='html')
+                        logging.info("Warning text added")
             else:
                 if message.get_content_type() == 'text/html':
                     html = message.get_content()
                     warning_html = "<div style='color:red; font-weight:bold;'>Do not open any attachment or click on links in this email.</div><br/>" + html
                     message.set_content(warning_html, subtype='html')
+                    logging.info("Warning text added")
 
         mailToFilter = 0
         mailRejected = 0
