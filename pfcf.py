@@ -34,15 +34,24 @@ class CustomSMTPHandler(AsyncMessage):
         )
 
     async def handle_message(self, message: EmailMessage):
-        # --- LOOP PREVENTION CHECK ---
-        if message.get('X-PFCF-Processed') == 'yes' or message.get('X-Loop') == 'pfcf@metclouds.com':
-            syslog.syslog('pfcf: Loop detected. Skipping message.')
-            logging.warning("Loop detected. Skipping message.")
+        # --- LOOP RETRY LOGIC ---
+        loop_count = int(message.get('X-PFCF-Loop-Count', '0'))
+
+        if loop_count >= 2 or message.get('X-PFCF-Processed') == 'yes':
+            syslog.syslog('pfcf: Message already fully processed or retried. Skipping.')
+            logging.warning("Message marked as processed or exceeded loop retry. Skipping further actions.")
             return
 
-        # --- ADD LOOP PREVENTION HEADERS ---
-        message.add_header('X-PFCF-Processed', 'yes')
-        message.add_header('X-Loop', 'pfcf@metclouds.com')  # Use your own unique domain
+        # Update loop count and headers
+        loop_count += 1
+        if message.get('X-PFCF-Loop-Count'):
+            message.replace_header('X-PFCF-Loop-Count', str(loop_count))
+        else:
+            message.add_header('X-PFCF-Loop-Count', str(loop_count))
+
+        if loop_count == 2:
+            message.add_header('X-PFCF-Processed', 'yes')
+            
         mailfrom = message['X-MailFrom'].replace("'", "").replace('"', '')
         xrcpttos = []
         xrcpttos.extend(message.get_all('X-RcptTo', []))
