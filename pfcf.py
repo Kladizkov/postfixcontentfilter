@@ -142,14 +142,14 @@ class CustomSMTPHandler(AsyncMessage):
                         if ctype == 'text/html' and warning_text_html:
                             html = part.get_payload(decode=True).decode(errors='replace')
                             warning_html = warning_text_html + html
-                            part.set_payload(warning_html)
+                            part.set_payload(warning_html.encode('utf-8'))
                             part.set_type('text/html')
                             part.set_charset('utf-8')
                             logging.info("Warning text added to HTML part")
                         elif ctype == 'text/plain' and warning_text_plain:
                             text = part.get_payload(decode=True).decode(errors='replace')
                             warning_plain = warning_text_plain + text
-                            part.set_payload(warning_plain)
+                            part.set_payload(warning_plain.encode('utf-8'))
                             part.set_type('text/plain')
                             part.set_charset('utf-8')
                             logging.info("Warning text added to plain text part")
@@ -158,14 +158,14 @@ class CustomSMTPHandler(AsyncMessage):
                     if ctype == 'text/html' and warning_text_html:
                         html = message.get_payload(decode=True).decode(errors='replace')
                         warning_html = warning_text_html + html
-                        message.set_payload(warning_html)
+                        message.set_payload(warning_html.encode('utf-8'))
                         message.set_type('text/html')
                         message.set_charset('utf-8')
                         logging.info("Warning text added to HTML message")
                     elif ctype == 'text/plain' and warning_text_plain:
                         text = message.get_payload(decode=True).decode(errors='replace')
                         warning_plain = warning_text_plain + text
-                        message.set_payload(warning_plain)
+                        message.set_payload(warning_plain.encode('utf-8'))
                         message.set_type('text/plain')
                         message.set_charset('utf-8')
                         logging.info("Warning text added to plain text message")
