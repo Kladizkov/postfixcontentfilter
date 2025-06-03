@@ -88,14 +88,14 @@ class CustomSMTPHandler(AsyncMessage):
                 for part in message.walk():
                     if part.get_content_type() == 'text/html':
                         html = part.get_payload(decode=True).decode(errors='replace')
-                        warning_html = "<div style='color:red; font-weight:bold;'>Do not open any attachment or click on links in this email.</div><br/>" + html
+                        warning_html = "<div style='color:red; font-weight:bold;'>CAUTION: This email is from an unknown source. Please exercise caution with attachments and links.</div><br/>" + html
                         part.set_payload(warning_html)
                         part.set_type('text/html')
                         logging.info("Warning text added")
             else:
                 if message.get_content_type() == 'text/html':
                     html = message.get_payload(decode=True).decode(errors='replace')
-                    warning_html = "<div style='color:red; font-weight:bold;'>Do not open any attachment or click on links in this email.</div><br/>" + html
+                    warning_html = "<div style='color:red; font-weight:bold;'>CAUTION: This email is from an unknown source. Please exercise caution with attachments and links.</div><br/>" + html
                     message.set_payload(warning_html)
                     message.set_type('text/html')
                     logging.info("Warning text added")
