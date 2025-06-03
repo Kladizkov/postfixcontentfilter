@@ -9,6 +9,7 @@ import syslog
 import systemd.daemon
 import configparser
 import datetime
+import re
 
 
 class CustomSMTPHandler(AsyncMessage):
@@ -84,21 +85,86 @@ class CustomSMTPHandler(AsyncMessage):
             return False
 
         if self.warnOnUnknownDomain and sender_domain not in self.knownDomains and not is_recipient_exempt():
+            # Check for attachments and links
+            has_attachments = False
+            has_links = False
+
+            # Check for attachments
+            for part in message.walk() if message.is_multipart() else [message]:
+                content_disposition = part.get("Content-Disposition", "")
+                if content_disposition and content_disposition.strip().lower().startswith("attachment"):
+                    has_attachments = True
+                    break
+
+            # Check for links in text/plain or text/html parts
+            url_regex = re.compile(r'https?://|www\.')
+
+            def part_has_links(part):
+                ctype = part.get_content_type()
+                if ctype in ('text/plain', 'text/html'):
+                    try:
+                        payload = part.get_payload(decode=True)
+                        if payload is not None:
+                            text = payload.decode(errors='replace')
+                            if url_regex.search(text):
+                                return True
+                    except Exception:
+                        pass
+                return False
+
             if message.is_multipart():
                 for part in message.walk():
-                    if part.get_content_type() == 'text/html':
-                        html = part.get_payload(decode=True).decode(errors='replace')
-                        warning_html = "<div style='color:red; font-weight:bold;'>CAUTION: This email is from an unknown source. Please exercise caution with attachments and links.</div><br/>" + html
-                        part.set_payload(warning_html)
-                        part.set_type('text/html')
-                        logging.info("Warning text added")
+                    if part_has_links(part):
+                        has_links = True
+                        break
             else:
-                if message.get_content_type() == 'text/html':
-                    html = message.get_payload(decode=True).decode(errors='replace')
-                    warning_html = "<div style='color:red; font-weight:bold;'>CAUTION: This email is from an unknown source. Please exercise caution with attachments and links.</div><br/>" + html
-                    message.set_payload(warning_html)
-                    message.set_type('text/html')
-                    logging.info("Warning text added")
+                if part_has_links(message):
+                    has_links = True
+
+            # Compose warning text
+            warning_text_html = ""
+            warning_text_plain = ""
+            if has_attachments and has_links:
+                warning_text_html = "<div style='color:red; font-weight:bold;'>CAUTION: This email contains attachments and links. Please exercise caution.</div><br/>"
+                warning_text_plain = "CAUTION: This email contains attachments and links. Please exercise caution.\n\n"
+            elif has_attachments:
+                warning_text_html = "<div style='color:red; font-weight:bold;'>CAUTION: This email contains attachments. Please exercise caution.</div><br/>"
+                warning_text_plain = "CAUTION: This email contains attachments. Please exercise caution.\n\n"
+            elif has_links:
+                warning_text_html = "<div style='color:red; font-weight:bold;'>CAUTION: This email contains links. Please exercise caution.</div><br/>"
+                warning_text_plain = "CAUTION: This email contains links. Please exercise caution.\n\n"
+
+            # Only add warning if needed
+            if warning_text_html or warning_text_plain:
+                if message.is_multipart():
+                    for part in message.walk():
+                        ctype = part.get_content_type()
+                        if ctype == 'text/html' and warning_text_html:
+                            html = part.get_payload(decode=True).decode(errors='replace')
+                            warning_html = warning_text_html + html
+                            part.set_payload(warning_html)
+                            part.set_type('text/html')
+                            logging.info("Warning text added to HTML part")
+                        elif ctype == 'text/plain' and warning_text_plain:
+                            text = part.get_payload(decode=True).decode(errors='replace')
+                            warning_plain = warning_text_plain + text
+                            part.set_payload(warning_plain)
+                            part.set_type('text/plain')
+                            logging.info("Warning text added to plain text part")
+                else:
+                    ctype = message.get_content_type()
+                    if ctype == 'text/html' and warning_text_html:
+                        html = message.get_payload(decode=True).decode(errors='replace')
+                        warning_html = warning_text_html + html
+                        message.set_payload(warning_html)
+                        message.set_type('text/html')
+                        logging.info("Warning text added to HTML message")
+                    elif ctype == 'text/plain' and warning_text_plain:
+                        text = message.get_payload(decode=True).decode(errors='replace')
+                        warning_plain = warning_text_plain + text
+                        message.set_payload(warning_plain)
+                        message.set_type('text/plain')
+                        logging.info("Warning text added to plain text message")
 
         mailToFilter = 0
         mailRejected = 0
@@ -136,7 +202,13 @@ class CustomSMTPHandler(AsyncMessage):
             logging.info("Allowed recipients: %s", ', '.join(send_to))
             if send_to:
                with smtplib.SMTP('localhost', 10026) as server:
-                server.send_message(message, from_addr=mailfrom, to_addrs=send_to)
+                try:
+                    server.send_message(message, from_addr=mailfrom, to_addrs=send_to)
+                except Exception as e:
+                    syslog.syslog(f'pfcf: Exception during send_message - {str(e)}')
+                    logging.error("Exception during send_message")
+                    logging.error(traceback.format_exc())
+                    logging.error("Failed message content:\n%s", message.as_string())
                 logging.info("Send successful")
 
             if mailRejected:
