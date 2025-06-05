@@ -10,7 +10,18 @@ import systemd.daemon
 import configparser
 import datetime
 import re
+from bs4 import BeautifulSoup
 
+def insert_warning_into_body(warning_html, html_content):
+    soup = BeautifulSoup(html_content, 'html.parser')
+
+    body = soup.find('body')
+    if body:
+        body.insert(0, BeautifulSoup(warning_html, 'html.parser'))
+    else:
+        soup.insert(0, BeautifulSoup(warning_html, 'html.parser'))
+
+    return str(soup)
 
 class CustomSMTPHandler(AsyncMessage):
     def __init__(self, config):
@@ -125,13 +136,37 @@ class CustomSMTPHandler(AsyncMessage):
             warning_text_html = ""
             warning_text_plain = ""
             if has_attachments and has_links:
-                warning_text_html = "<div style='color:red; font-weight:bold;'>CAUTION: This email contains attachments and links. Please exercise caution.</div><br/>"
+                warning_text_html = """
+                <table role="presentation" width="100%%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                    <td style="color: red; font-weight: bold; font-family: Arial, sans-serif; padding: 10px;">
+                    ⚠️ CAUTION: This email contains attachments and links. Please exercise caution.
+                    </td>
+                </tr>
+                </table><br/>
+                """
                 warning_text_plain = "CAUTION: This email contains attachments and links. Please exercise caution.\n\n"
             elif has_attachments:
-                warning_text_html = "<div style='color:red; font-weight:bold;'>CAUTION: This email contains attachments. Please exercise caution.</div><br/>"
+                warning_text_html = """
+                <table role="presentation" width="100%%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                    <td style="color: red; font-weight: bold; font-family: Arial, sans-serif; padding: 10px;">
+                    ⚠️ CAUTION: This email contains attachments. Please exercise caution.
+                    </td>
+                </tr>
+                </table><br/>
+                """
                 warning_text_plain = "CAUTION: This email contains attachments. Please exercise caution.\n\n"
             elif has_links:
-                warning_text_html = "<div style='color:red; font-weight:bold;'>CAUTION: This email contains links. Please exercise caution.</div><br/>"
+                warning_text_html = """
+                <table role="presentation" width="100%%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                    <td style="color: red; font-weight: bold; font-family: Arial, sans-serif; padding: 10px;">
+                    ⚠️ CAUTION: This email contains links. Please exercise caution.
+                    </td>
+                </tr>
+                </table><br/>
+                """
                 warning_text_plain = "CAUTION: This email contains links. Please exercise caution.\n\n"
 
             # Only add warning if needed
@@ -141,7 +176,7 @@ class CustomSMTPHandler(AsyncMessage):
                         ctype = part.get_content_type()
                         if ctype == 'text/html' and warning_text_html:
                             html = part.get_payload(decode=True).decode(errors='replace')
-                            warning_html = warning_text_html + html
+                            warning_html = insert_warning_into_body(warning_text_html, html)
                             part.set_payload(warning_html.encode('utf-8'))
                             part.set_type('text/html')
                             part.set_charset('utf-8')
@@ -157,7 +192,7 @@ class CustomSMTPHandler(AsyncMessage):
                     ctype = message.get_content_type()
                     if ctype == 'text/html' and warning_text_html:
                         html = message.get_payload(decode=True).decode(errors='replace')
-                        warning_html = warning_text_html + html
+                        warning_html = insert_warning_into_body(warning_text_html, html)
                         message.set_payload(warning_html.encode('utf-8'))
                         message.set_type('text/html')
                         message.set_charset('utf-8')
