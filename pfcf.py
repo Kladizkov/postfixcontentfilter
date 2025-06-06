@@ -82,7 +82,15 @@ class CustomSMTPHandler(AsyncMessage):
         logging.info("Message addressed from: %s", mailfrom)
         logging.info("Message addressed to (X-RcptTo): %s", ', '.join(xrcpttos)) if xrcpttos else logging.info("No X-RcptTo recipients")
 
-                # --- UNKNOWN DOMAIN WARNING ---
+        # --- EXTRACT DKIM SIGNED DOMAINS ---
+        dkim_domains = []
+        for dkim_header in message.get_all('DKIM-Signature', []):
+            match = re.search(r'd=([a-zA-Z0-9.-]+)', dkim_header)
+            if match:
+                dkim_domains.append(match.group(1).lower())
+        logging.info("DKIM signed domains: %s", ', '.join(dkim_domains) if dkim_domains else "None found")
+
+        # --- UNKNOWN DOMAIN WARNING ---
         sender_domain = mailfrom.split('@')[-1].lower() if '@' in mailfrom else ''
 
         def is_recipient_exempt():
@@ -95,7 +103,12 @@ class CustomSMTPHandler(AsyncMessage):
                     return True
             return False
 
-        if self.warnOnUnknownDomain and sender_domain not in self.knownDomains and not is_recipient_exempt():
+        if (
+            self.warnOnUnknownDomain
+            and sender_domain not in self.knownDomains
+            and not is_recipient_exempt()
+            and not any(domain in dkim_domains for domain in self.knownDomains if domain)
+        ):
             # Check for attachments and links
             has_attachments = False
             has_links = False
