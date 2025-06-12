@@ -93,6 +93,12 @@ class CustomSMTPHandler(AsyncMessage):
         # --- UNKNOWN DOMAIN WARNING ---
         sender_domain = mailfrom.split('@')[-1].lower() if '@' in mailfrom else ''
 
+        # Check if sender_domain is present in dkim_domains
+        is_spoofed = False
+        if sender_domain and sender_domain not in dkim_domains:
+            is_spoofed = True
+            logging.warning("Sender domain %s is not in DKIM signed domains: %s", sender_domain, ', '.join(dkim_domains))
+
         def is_recipient_exempt():
             for rcpt in xrcpttos:
                 rcpt = rcpt.lower()
@@ -148,7 +154,27 @@ class CustomSMTPHandler(AsyncMessage):
             # Compose warning text
             warning_text_html = ""
             warning_text_plain = ""
-            if has_attachments and has_links:
+            if is_spoofed:
+                parts = ["This email appears to be spoofed"]
+                if has_attachments and has_links:
+                    parts.append("and contains attachments and links")
+                elif has_attachments:
+                    parts.append("and contains attachments")
+                elif has_links:
+                    parts.append("and contains links")
+
+                full_warning_html = "⚠️ CAUTION: " + ", ".join(parts) + ". Please exercise extreme caution."
+                warning_text_html = f"""
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                    <td style="color: red; font-weight: bold; font-family: Arial, sans-serif; padding: 10px;">
+                    {full_warning_html}
+                    </td>
+                </tr>
+                </table><br/>
+                """
+                warning_text_plain = "CAUTION: " + ", ".join(parts) + ". Please exercise extreme caution.\n\n"
+            elif has_attachments and has_links:
                 warning_text_html = """
                 <table role="presentation" width="100%%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
