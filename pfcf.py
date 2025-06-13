@@ -41,6 +41,7 @@ class CustomSMTPHandler(AsyncMessage):
         self.addressesAllowedForOutbound = self.config.get('default', 'AddressesAllowedForOutbound').split(',')
         self.allowedOutboundDomains = self.config.get('default', 'AllowedOutboundDomains').split(',')
         self.bounceSender = self.config.get('default', 'BounceSender')
+        self.domainsToCheckSpoofing = self.config.get('default', 'DomainsToCheckSpoofing', fallback='').split(',')
         logFile = self.config.get('default', 'LogFile')
 
         logging.basicConfig(
@@ -92,12 +93,25 @@ class CustomSMTPHandler(AsyncMessage):
 
         # --- UNKNOWN DOMAIN WARNING ---
         sender_domain = mailfrom.split('@')[-1].lower() if '@' in mailfrom else ''
+        # Extract sender_domain from "From:" header in the message body
+        from_header = message.get('From', '')
+        match = re.search(r'@([a-zA-Z0-9.-]+)', from_header)
+        if match:
+            sender_domain_in_fromheader = match.group(1).lower()
+        else:
+            sender_domain_in_fromheader = ''
+
+        logging.info("Sender domain from X-MailFrom: %s", sender_domain)
+        logging.info("Sender domain from From header: %s", sender_domain_in_fromheader)
 
         # Check if sender_domain is present in dkim_domains
         is_spoofed = False
-        if sender_domain and sender_domain not in dkim_domains:
+        if sender_domain and sender_domain in self.domainsToCheckSpoofing and sender_domain not in dkim_domains:
             is_spoofed = True
-            logging.warning("Sender domain %s is not in DKIM signed domains: %s", sender_domain, ', '.join(dkim_domains))
+            if dkim_domains:
+                logging.warning("Sender domain %s is not in DKIM signed domains: %s", sender_domain, ', '.join(dkim_domains))
+            else:
+                logging.warning("Sender domain %s is not in DKIM signed domains: No DKIM signatures found", sender_domain)
 
         def is_recipient_exempt():
             for rcpt in xrcpttos:
@@ -110,10 +124,11 @@ class CustomSMTPHandler(AsyncMessage):
             return False
 
         if (
-            self.warnOnUnknownDomain
+            (self.warnOnUnknownDomain
             and sender_domain not in self.knownDomains
             and not is_recipient_exempt()
-            and not any(domain in dkim_domains for domain in self.knownDomains if domain)
+            and not any(domain in dkim_domains for domain in self.knownDomains if domain))
+            or is_spoofed
         ):
             # Check for attachments and links
             has_attachments = False
