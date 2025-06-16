@@ -104,6 +104,12 @@ class CustomSMTPHandler(AsyncMessage):
         logging.info("Sender domain from X-MailFrom: %s", sender_domain)
         logging.info("Sender domain from From header: %s", sender_domain_in_fromheader)
 
+        # Determine sender_domain priority
+        if not sender_domain and sender_domain_in_fromheader:
+            sender_domain = sender_domain_in_fromheader
+        elif sender_domain and sender_domain_in_fromheader:
+            sender_domain = sender_domain_in_fromheader
+
         # Check if sender_domain is present in dkim_domains
         is_spoofed = False
         if sender_domain and sender_domain in self.domainsToCheckSpoofing and sender_domain not in dkim_domains:
