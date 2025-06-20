@@ -240,6 +240,8 @@ class CustomSMTPHandler(AsyncMessage):
                             part.set_payload(warning_html.encode('utf-8'))
                             part.set_type('text/html')
                             part.set_charset('utf-8')
+                            if part['Content-Transfer-Encoding']:
+                                del part['Content-Transfer-Encoding']
                             logging.info("Warning text added to HTML part")
                         elif ctype == 'text/plain' and warning_text_plain:
                             text = part.get_payload(decode=True).decode(errors='replace')
@@ -256,6 +258,8 @@ class CustomSMTPHandler(AsyncMessage):
                         message.set_payload(warning_html.encode('utf-8'))
                         message.set_type('text/html')
                         message.set_charset('utf-8')
+                        if part['Content-Transfer-Encoding']:
+                            del part['Content-Transfer-Encoding']
                         logging.info("Warning text added to HTML message")
                     elif ctype == 'text/plain' and warning_text_plain:
                         text = message.get_payload(decode=True).decode(errors='replace')
