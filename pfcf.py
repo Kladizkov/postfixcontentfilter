@@ -11,6 +11,7 @@ import configparser
 import datetime
 import re
 from bs4 import BeautifulSoup
+import base64
 
 def insert_warning_into_body(warning_html, html_content):
     soup = BeautifulSoup(html_content, 'html.parser')
@@ -235,36 +236,68 @@ class CustomSMTPHandler(AsyncMessage):
                     for part in message.walk():
                         ctype = part.get_content_type()
                         if ctype == 'text/html' and warning_text_html:
-                            html = part.get_payload(decode=True).decode(errors='replace')
+                            # Detect the original Content-Transfer-Encoding
+                            orig_cte = part.get('Content-Transfer-Encoding', '').lower()
+                            html_bytes = part.get_payload(decode=True)
+                            html = html_bytes.decode(errors='replace')
                             warning_html = insert_warning_into_body(warning_text_html, html)
-                            part.set_payload(warning_html.encode('utf-8'))
+                            # Set payload as text, then encode if needed
+                            if orig_cte == 'base64':
+                                # Set payload as base64-encoded
+                                encoded_payload = base64.b64encode(warning_html.encode('utf-8')).decode('ascii')
+                                part.set_payload(encoded_payload)
+                                part.replace_header('Content-Transfer-Encoding', 'base64')
+                            else:
+                                # Default to 8bit
+                                part.set_payload(warning_html.encode('utf-8'))
+                                part.replace_header('Content-Transfer-Encoding', '8bit')
                             part.set_type('text/html')
                             part.set_charset('utf-8')
-                            if part['Content-Transfer-Encoding']:
-                                del part['Content-Transfer-Encoding']
                             logging.info("Warning text added to HTML part")
                         elif ctype == 'text/plain' and warning_text_plain:
-                            text = part.get_payload(decode=True).decode(errors='replace')
+                            orig_cte = part.get('Content-Transfer-Encoding', '').lower()
+                            text_bytes = part.get_payload(decode=True)
+                            text = text_bytes.decode(errors='replace') if text_bytes is not None else ''
                             warning_plain = warning_text_plain + text
-                            part.set_payload(warning_plain.encode('utf-8'))
+                            if orig_cte == 'base64':
+                                encoded_payload = base64.b64encode(warning_plain.encode('utf-8')).decode('ascii')
+                                part.set_payload(encoded_payload)
+                                part.replace_header('Content-Transfer-Encoding', 'base64')
+                            else:
+                                part.set_payload(warning_plain.encode('utf-8'))
+                                part.replace_header('Content-Transfer-Encoding', '8bit')
                             part.set_type('text/plain')
                             part.set_charset('utf-8')
                             logging.info("Warning text added to plain text part")
                 else:
                     ctype = message.get_content_type()
                     if ctype == 'text/html' and warning_text_html:
-                        html = message.get_payload(decode=True).decode(errors='replace')
+                        orig_cte = message.get('Content-Transfer-Encoding', '').lower()
+                        html_bytes = message.get_payload(decode=True)
+                        html = html_bytes.decode(errors='replace') if html_bytes is not None else ''
                         warning_html = insert_warning_into_body(warning_text_html, html)
-                        message.set_payload(warning_html.encode('utf-8'))
+                        if orig_cte == 'base64':
+                            encoded_payload = base64.b64encode(warning_html.encode('utf-8')).decode('ascii')
+                            message.set_payload(encoded_payload)
+                            message.replace_header('Content-Transfer-Encoding', 'base64')
+                        else:
+                            message.set_payload(warning_html.encode('utf-8'))
+                            message.replace_header('Content-Transfer-Encoding', '8bit')
                         message.set_type('text/html')
                         message.set_charset('utf-8')
-                        if part['Content-Transfer-Encoding']:
-                            del part['Content-Transfer-Encoding']
                         logging.info("Warning text added to HTML message")
                     elif ctype == 'text/plain' and warning_text_plain:
-                        text = message.get_payload(decode=True).decode(errors='replace')
+                        orig_cte = message.get('Content-Transfer-Encoding', '').lower()
+                        text_bytes = message.get_payload(decode=True)
+                        text = text_bytes.decode(errors='replace') if text_bytes is not None else ''
                         warning_plain = warning_text_plain + text
-                        message.set_payload(warning_plain.encode('utf-8'))
+                        if orig_cte == 'base64':
+                            encoded_payload = base64.b64encode(warning_plain.encode('utf-8')).decode('ascii')
+                            message.set_payload(encoded_payload)
+                            message.replace_header('Content-Transfer-Encoding', 'base64')
+                        else:
+                            message.set_payload(warning_plain.encode('utf-8'))
+                            message.replace_header('Content-Transfer-Encoding', '8bit')
                         message.set_type('text/plain')
                         message.set_charset('utf-8')
                         logging.info("Warning text added to plain text message")
