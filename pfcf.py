@@ -399,9 +399,11 @@ if __name__ == '__main__':
 
     config = configparser.ConfigParser()
     config.read('/etc/pfcf.ini')
-
+    size_mb = config.getint("default", "SizeInMb", fallback=32)
+    data_size_limit_bytes = size_mb * 1024 * 1024
+    
     handler = CustomSMTPHandler(config)
-    controller = Controller(handler, hostname='127.0.0.1', port=10025)
+    controller = Controller(handler, hostname='127.0.0.1', port=10025, data_size_limit=data_size_limit_bytes)
     controller.start()
     print("SMTP server running. Press Ctrl+C to stop.")
     try:
