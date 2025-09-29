@@ -346,18 +346,20 @@ class CustomSMTPHandler(AsyncMessage):
             logging.error(traceback.format_exc())
 
         try:
-            send_to = xrcpttos_filtered if (mailToFilter == 1 and xrcpttos_filtered) else xrcpttos
-            logging.info("Allowed recipients: %s", ', '.join(send_to))
-            if send_to:
-               with smtplib.SMTP('localhost', 10026) as server:
-                try:
-                    server.send_message(message, from_addr=mailfrom, to_addrs=send_to)
-                except Exception as e:
-                    syslog.syslog(f'pfcf: Exception during send_message - {str(e)}')
-                    logging.error("Exception during send_message")
-                    logging.error(traceback.format_exc())
-                    logging.error("Failed message content:\n%s", message.as_string())
-                logging.info("Send successful")
+            # Skip sending if mailRejected is 1 and xrcpttos_filtered is empty
+            if not (mailRejected == 1 and not xrcpttos_filtered):
+                send_to = xrcpttos_filtered if (mailToFilter == 1 and xrcpttos_filtered) else xrcpttos
+                logging.info("Allowed recipients: %s", ', '.join(send_to))
+                if send_to:
+                    with smtplib.SMTP('localhost', 10026) as server:
+                        try:
+                            server.send_message(message, from_addr=mailfrom, to_addrs=send_to)
+                        except Exception as e:
+                            syslog.syslog(f'pfcf: Exception during send_message - {str(e)}')
+                            logging.error("Exception during send_message")
+                            logging.error(traceback.format_exc())
+                            logging.error("Failed message content:\n%s", message.as_string())
+                        logging.info("Send successful")
 
             if mailRejected:
                 x = datetime.datetime.now().strftime("%a, %d %b %Y %H:%M:%S +0530")
